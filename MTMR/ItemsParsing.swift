@@ -452,6 +452,7 @@ struct Action: Decodable {
     
     enum Value {
         case none
+        case quit
         case hidKey(keycode: Int32)
         case keyPress(keycode: Int)
         case appleScript(source: SourceProtocol)
@@ -461,6 +462,7 @@ struct Action: Decodable {
     }
     
     private enum ActionTypeRaw: String, Decodable {
+        case quit
         case hidKey
         case keyPress
         case appleScript
@@ -488,6 +490,9 @@ struct Action: Decodable {
         let type = try container.decodeIfPresent(ActionTypeRaw.self, forKey: .action)
 
         switch type {
+        case .some(.quit):
+            value = .quit
+
         case .some(.hidKey):
             let keycode = try container.decode(Int32.self, forKey: .keycode)
             value = .hidKey(keycode: keycode)
@@ -503,7 +508,13 @@ struct Action: Decodable {
         case .some(.shellScript):
             let executable = try container.decode(String.self, forKey: .executablePath)
             let parameters = try container.decodeIfPresent([String].self, forKey: .shellArguments) ?? []
-            value = .shellScript(executable: executable, parameters: parameters)
+            if executable == "/usr/bin/killall", parameters == ["MTMR"] {
+                // Preserve compatibility with the old bundled power button without
+                // abruptly killing the app while Touch Bar is handling the tap.
+                value = .quit
+            } else {
+                value = .shellScript(executable: executable, parameters: parameters)
+            }
 
         case .some(.openUrl):
             let url = try container.decode(String.self, forKey: .url)

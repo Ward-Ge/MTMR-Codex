@@ -227,7 +227,18 @@ class CustomButtonCell: NSButtonCell {
 
     func setAttributedTitle(_ title: NSAttributedString, withColor color: NSColor) {
         let attrTitle = NSMutableAttributedString(attributedString: title)
-        attrTitle.addAttributes([.foregroundColor: color], range: NSRange(location: 0, length: attrTitle.length))
+        let fullRange = NSRange(location: 0, length: attrTitle.length)
+        var transparentRanges: [NSRange] = []
+        attrTitle.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+            if let currentColor = value as? NSColor, currentColor.alphaComponent == 0 {
+                transparentRanges.append(range)
+            }
+        }
+
+        attrTitle.addAttributes([.foregroundColor: color], range: fullRange)
+        for range in transparentRanges {
+            attrTitle.addAttribute(.foregroundColor, value: NSColor.clear, range: range)
+        }
         attributedTitle = attrTitle
     }
 }

@@ -8,9 +8,7 @@
     "actions": [
       {
         "trigger": "singleTap",
-        "action": "shellScript",
-        "executablePath": "/usr/bin/killall",
-        "shellArguments": ["MTMR"]
+        "action": "quit"
       }
     ]
   },

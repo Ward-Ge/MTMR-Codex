@@ -310,6 +310,18 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         updateControlStripPresence()
     }
 
+    private func quitApplication() {
+        if let touchBar = touchBar {
+            minimizeSystemModal(touchBar)
+        }
+        DFRElementSetControlStripPresenceForIdentifier(.controlStripItem, false)
+
+        // Finish the current Touch Bar event before asking AppKit to terminate.
+        DispatchQueue.main.async {
+            NSApp.terminate(nil)
+        }
+    }
+
     @objc func resetControlStrip() {
         dismissTouchBar()
         updateActiveApp()
@@ -420,6 +432,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     
     func closure(for action: Action) -> (() -> Void)? {
         switch action.value {
+        case .quit:
+            return { [weak self] in self?.quitApplication() }
         case let .hidKey(keycode: keycode):
             return { HIDPostAuxKey(keycode) }
         case let .keyPress(keycode: keycode):
