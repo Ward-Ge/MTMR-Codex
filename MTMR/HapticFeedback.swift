@@ -57,12 +57,12 @@ class HapticFeedback {
         }
 
         // Let's find our Haptic device
-        self.possibleDeviceIDs.forEach {(deviceID) in
-            let actuatorRef = MTActuatorCreateFromDeviceID(deviceID).takeRetainedValue()
-
-            if actuatorRef != nil {
-                self.actuatorRef = actuatorRef
+        for deviceID in possibleDeviceIDs {
+            guard let actuatorRef = MTActuatorCreateFromDeviceID(deviceID)?.takeRetainedValue() else {
+                continue
             }
+            self.actuatorRef = actuatorRef
+            break
         }
     }
 
