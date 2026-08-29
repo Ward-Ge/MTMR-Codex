@@ -1,0 +1,33 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag and app version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' MTMR/Info.plist)"
+          test "$TAG_VERSION" = "$APP_VERSION"
+
+      - name: Build universal release
+        run: ./scripts/package-free.sh
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            Release/MTMR-Codex-*-macOS-universal.dmg
+            Release/MTMR-Codex-*-macOS-universal.zip

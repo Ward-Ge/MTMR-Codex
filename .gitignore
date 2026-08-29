@@ -1,0 +1,55 @@
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode build products and test results
+build/
+DerivedData/
+Release/
+*.hmap
+*.dSYM
+*.dSYM.zip
+*.ipa
+*.xcarchive
+*.xcresult
+*.profraw
+*.profdata
+
+# Xcode per-user state. Shared schemes remain tracked for a new device.
+xcuserdata/
+*.xcuserstate
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xccheckout
+*.xcscmblueprint
+*.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# Dependency build caches; dependency lock files stay tracked.
+.build/
+Carthage/Build/
+
+# Local editor and temporary files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.log
+*.tmp
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.provisionprofile

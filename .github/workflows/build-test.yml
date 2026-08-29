@@ -1,0 +1,42 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project MTMR.xcodeproj \
+            -scheme UnitTests \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/MTMRTests" \
+            CODE_SIGNING_ALLOWED=NO
+
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal app
+        run: |
+          xcodebuild build \
+            -project MTMR.xcodeproj \
+            -scheme MTMR \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/MTMRBuild" \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify universal binary
+        run: lipo -archs "$RUNNER_TEMP/MTMRBuild/Build/Products/Release/MTMR.app/Contents/MacOS/MTMR" | grep -Eq '^(x86_64 arm64|arm64 x86_64)$'

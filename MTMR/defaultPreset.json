@@ -1,0 +1,35 @@
+[
+  {
+    "type": "staticButton",
+    "title": "⏻",
+    "width": 45,
+    "align": "left",
+    "bordered": false,
+    "actions": [
+      {
+        "trigger": "singleTap",
+        "action": "shellScript",
+        "executablePath": "/usr/bin/killall",
+        "shellArguments": ["MTMR"]
+      }
+    ]
+  },
+  {
+    "type": "staticButton",
+    "title": "",
+    "width": 225,
+    "align": "left",
+    "bordered": false,
+    "background": "#000000"
+  },
+  {
+    "type": "shellScriptTitledButton",
+    "width": 350,
+    "refreshInterval": 60,
+    "align": "center",
+    "bordered": false,
+    "source": {
+      "inline": "/bin/cat \"$HOME/Library/Application Support/MTMR/codex-quota.txt\""
+    }
+  }
+]
