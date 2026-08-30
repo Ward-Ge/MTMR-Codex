@@ -18,12 +18,23 @@ struct GenericKeyPress: KeyPress {
 }
 
 enum EscapeKeyPress {
-    static func send() {
-        if #available(macOS 10.15, *), !CGPreflightPostEventAccess() {
-            guard CGRequestPostEventAccess() else { return }
-        }
+    static var hasAccess: Bool {
+        guard #available(macOS 10.15, *) else { return true }
+        return CGPreflightPostEventAccess()
+    }
+
+    @discardableResult
+    static func requestAccess() -> Bool {
+        guard #available(macOS 10.15, *) else { return true }
+        return CGPreflightPostEventAccess() || CGRequestPostEventAccess()
+    }
+
+    @discardableResult
+    static func send() -> Bool {
+        guard requestAccess() else { return false }
 
         GenericKeyPress(keyCode: 53).send()
+        return true
     }
 }
 

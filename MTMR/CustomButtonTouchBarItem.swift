@@ -27,6 +27,7 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
             multiClick.isDoubleClickEnabled = actions.filter({ $0.trigger == .doubleTap }).count > 0
             multiClick.isTripleClickEnabled = actions.filter({ $0.trigger == .tripleTap }).count > 0
             longClick.isEnabled = actions.filter({ $0.trigger == .longTap }).count > 0
+            configureSingleTapHandling()
         }
     }
     var finishViewConfiguration: ()->() = {}
@@ -123,7 +124,27 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
         view.addGestureRecognizer(longClick)
         // view.addGestureRecognizer(singleClick)
         view.addGestureRecognizer(multiClick)
+        configureSingleTapHandling()
         finishViewConfiguration()
+    }
+
+    private func configureSingleTapHandling() {
+        guard button != nil, multiClick != nil, longClick != nil else { return }
+
+        let hasSingleTap = actions.contains { $0.trigger == .singleTap }
+        let hasComplexTap = actions.contains {
+            $0.trigger == .doubleTap || $0.trigger == .tripleTap || $0.trigger == .longTap
+        }
+        let usesNativeSingleTap = hasSingleTap && !hasComplexTap
+
+        multiClick.isEnabled = !usesNativeSingleTap
+        button.target = usesNativeSingleTap ? self : nil
+        button.action = usesNativeSingleTap ? #selector(handleNativeSingleTap) : nil
+    }
+
+    @objc private func handleNativeSingleTap() {
+        HapticFeedback.instance.tap(type: .click)
+        callActions(for: .singleTap)
     }
 
     func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer, shouldRequireFailureOf otherGestureRecognizer: NSGestureRecognizer) -> Bool {

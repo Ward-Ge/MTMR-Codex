@@ -38,7 +38,6 @@ final class CodexQuotaService {
     private typealias ResponseHandler = (Result<JSON, Error>) -> Void
 
     private let queue = DispatchQueue(label: "com.wardge.mtmr.codex-quota")
-    private let refreshInterval: TimeInterval = 60
     private let requestTimeout: TimeInterval = 20
     private let cacheURL = URL(fileURLWithPath: appSupportDirectory, isDirectory: true)
         .appendingPathComponent("codex-quota.txt")
@@ -65,18 +64,7 @@ final class CodexQuotaService {
             self.removeLegacyUpdaterIfNeeded()
             self.createInitialCacheIfNeeded()
             self.refresh()
-
-            let timer = DispatchSource.makeTimerSource(queue: self.queue)
-            timer.schedule(
-                deadline: .now() + self.refreshInterval,
-                repeating: self.refreshInterval,
-                leeway: .seconds(5)
-            )
-            timer.setEventHandler { [weak self] in
-                self?.refresh()
-            }
-            self.timer = timer
-            timer.resume()
+            self.scheduleRefreshTimer()
         }
     }
 
@@ -94,6 +82,30 @@ final class CodexQuotaService {
         queue.async { [weak self] in
             self?.refresh()
         }
+    }
+
+    func updateRefreshInterval() {
+        queue.async { [weak self] in
+            guard let self = self, self.timer != nil else { return }
+            self.scheduleRefreshTimer()
+        }
+    }
+
+    private func scheduleRefreshTimer() {
+        timer?.cancel()
+
+        let interval = TimeInterval(max(1, AppSettings.codexRefreshIntervalSeconds))
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(
+            deadline: .now() + interval,
+            repeating: interval,
+            leeway: .seconds(min(5, max(1, Int(interval / 10))))
+        )
+        timer.setEventHandler { [weak self] in
+            self?.refresh()
+        }
+        self.timer = timer
+        timer.resume()
     }
 
     func login() {
@@ -162,7 +174,7 @@ final class CodexQuotaService {
                     let text = self.formatQuota(payload)
                 else {
                     // Keep the last successful cache. A failed refresh is retried only by the
-                    // next scheduled one-minute tick.
+                    // next scheduled refresh.
                     return
                 }
                 self.writeCache(text)

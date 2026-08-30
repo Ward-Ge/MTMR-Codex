@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var displaySettingsWindowController: DisplaySettingsWindowController?
     private var statusItemHotKey: EventHotKeyRef?
     private var statusItemHotKeyHandler: EventHandlerRef?
+    private var isShowingEscapePermissionHelp = false
 
     func applicationDidFinishLaunching(_: Notification) {
         AppSettings.configureMachineDefaults()
@@ -30,6 +31,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         createMenu()
         statusItem.isVisible = !AppSettings.hideStatusItemState
         registerStatusItemHotKey()
+
+        if AppSettings.showVirtualEscapeKeyState {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                EscapeKeyPress.requestAccess()
+                self.createMenu()
+            }
+        }
 
         reloadOnDefaultConfigChanged()
 
@@ -55,6 +63,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func refreshCodexQuota(_: Any?) {
         CodexQuotaService.shared.refreshNow()
+    }
+
+    @objc func configureCodexRefreshInterval(_: Any?) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .none
+        formatter.allowsFloats = false
+        formatter.minimum = 1
+        formatter.maximum = 86400
+
+        let input = NSTextField(frame: NSRect(x: 30, y: 0, width: 45, height: 24))
+        input.alignment = .right
+        input.formatter = formatter
+        input.integerValue = AppSettings.codexRefreshIntervalSeconds
+
+        let unitLabel = NSTextField(labelWithString: "秒")
+        unitLabel.frame = NSRect(x: 83, y: 3, width: 27, height: 18)
+
+        let accessoryView = NSView(frame: NSRect(x: 0, y: 0, width: 110, height: 24))
+        accessoryView.addSubview(input)
+        accessoryView.addSubview(unitLabel)
+
+        let alert = NSAlert()
+        alert.messageText = "Codex 自动刷新间隔"
+        alert.informativeText = "请输入 1–86400 秒的整数。"
+        alert.accessoryView = accessoryView
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "取消")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let seconds = min(86400, max(1, input.integerValue))
+        AppSettings.codexRefreshIntervalSeconds = seconds
+        CodexQuotaService.shared.updateRefreshInterval()
+        createMenu()
     }
 
     @objc func openDisplaySettings(_: Any?) {
@@ -141,6 +184,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         item.state = item.state == .on ? .off : .on
         AppSettings.showVirtualEscapeKeyState = item.state == .on
         TouchBarController.shared.refreshTouchBar()
+        if item.state == .on, !EscapeKeyPress.requestAccess() {
+            showVirtualEscapePermissionHelp()
+        }
+        createMenu()
+    }
+
+    @objc func requestVirtualEscapePermission(_: Any?) {
+        if !EscapeKeyPress.requestAccess() {
+            showVirtualEscapePermissionHelp()
+        } else {
+            createMenu()
+        }
+    }
+
+    func showVirtualEscapePermissionHelp() {
+        guard !isShowingEscapePermissionHelp else { return }
+        isShowingEscapePermissionHelp = true
+        defer { isShowingEscapePermissionHelp = false }
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "需要允许 MTMR 使用虚拟 Esc"
+        alert.informativeText = "请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 MTMR。\n\n如果列表中已经有 MTMR，但 Esc 仍然无效，请先删除旧的 MTMR，再重新添加 /Applications/MTMR.app，随后退出并重新打开 MTMR。"
+        alert.addButton(withTitle: "打开辅助功能设置")
+        alert.addButton(withTitle: "稍后")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(settingsURL)
+        }
     }
 
     @objc func hideStatusItem(_: Any?) {
@@ -220,12 +294,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hideStatusItem.keyEquivalentModifierMask = [.command, .option]
 
         menu.addItem(withTitle: "刷新 Codex 额度", action: #selector(refreshCodexQuota(_:)), keyEquivalent: "")
+        menu.addItem(
+            withTitle: "自动刷新间隔：\(AppSettings.codexRefreshIntervalSeconds) 秒…",
+            action: #selector(configureCodexRefreshInterval(_:)),
+            keyEquivalent: ""
+        )
         menu.addItem(withTitle: "显示设置…", action: #selector(openDisplaySettings(_:)), keyEquivalent: "")
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(hapticFeedback)
         menu.addItem(hideControlStrip)
         menu.addItem(virtualEscapeKey)
+        if AppSettings.showVirtualEscapeKeyState, !EscapeKeyPress.hasAccess {
+            menu.addItem(withTitle: "启用 Esc 权限…", action: #selector(requestVirtualEscapePermission(_:)), keyEquivalent: "")
+        }
         menu.addItem(startAtLogin)
         menu.addItem(hideStatusItem)
         menu.addItem(NSMenuItem.separator())

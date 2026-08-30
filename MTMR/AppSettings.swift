@@ -23,6 +23,9 @@ struct AppSettings {
     @UserDefault(key: "com.wardge.mtmr.settings.showVirtualEscapeKey", defaultValue: false)
     static var showVirtualEscapeKeyState: Bool
 
+    @UserDefault(key: "com.wardge.mtmr.settings.codexRefreshIntervalSeconds", defaultValue: 60)
+    static var codexRefreshIntervalSeconds: Int
+
     static func configureMachineDefaults() {
         let virtualEscapeKeyPreference = "com.wardge.mtmr.settings.showVirtualEscapeKey"
         guard UserDefaults.standard.object(forKey: virtualEscapeKeyPreference) == nil else { return }

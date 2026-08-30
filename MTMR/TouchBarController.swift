@@ -231,8 +231,11 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     }
 
     @objc private func sendVirtualEscapeKey() {
-        HapticFeedback.instance.tap(type: .click)
-        EscapeKeyPress.send()
+        if EscapeKeyPress.send() {
+            HapticFeedback.instance.tap(type: .click)
+        } else {
+            (NSApp.delegate as? AppDelegate)?.showVirtualEscapePermissionHelp()
+        }
     }
 
     @objc func activeApplicationChanged(_: Notification) {
