@@ -50,6 +50,7 @@ final class CodexQuotaService {
     private var initialized = false
     private var isStopping = false
     private var refreshInFlight = false
+    private var refreshPending = false
     private var loginInFlight = false
     private var nextRequestID = 1
     private var readyHandlers: [(Bool) -> Void] = []
@@ -74,6 +75,7 @@ final class CodexQuotaService {
             self.isStopping = true
             self.timer?.cancel()
             self.timer = nil
+            self.refreshPending = false
             self.stopServer(error: ServiceError.serverUnavailable)
         }
     }
@@ -88,6 +90,7 @@ final class CodexQuotaService {
         queue.async { [weak self] in
             guard let self = self, self.timer != nil else { return }
             self.scheduleRefreshTimer()
+            self.refresh()
         }
     }
 
@@ -97,7 +100,7 @@ final class CodexQuotaService {
         let interval = TimeInterval(max(1, AppSettings.codexRefreshIntervalSeconds))
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(
-            deadline: .now() + interval,
+            wallDeadline: .now() + interval,
             repeating: interval,
             leeway: .seconds(min(5, max(1, Int(interval / 10))))
         )
@@ -156,30 +159,42 @@ final class CodexQuotaService {
     }
 
     private func refresh() {
-        guard !refreshInFlight, !isStopping else { return }
+        guard !isStopping else { return }
+        guard !refreshInFlight else {
+            refreshPending = true
+            return
+        }
         refreshInFlight = true
 
         ensureServer { [weak self] ready in
             guard let self = self else { return }
             guard ready else {
-                self.refreshInFlight = false
+                self.finishRefresh()
                 return
             }
 
             self.sendRequest(method: "account/rateLimits/read", params: nil) { [weak self] result in
                 guard let self = self else { return }
-                self.refreshInFlight = false
                 guard case let .success(message) = result,
                     let payload = message["result"] as? JSON,
                     let text = self.formatQuota(payload)
                 else {
-                    // Keep the last successful cache. A failed refresh is retried only by the
-                    // next scheduled refresh.
+                    self.finishRefresh()
+                    // Keep the last successful cache. A failed refresh is retried by the next
+                    // queued or scheduled refresh.
                     return
                 }
                 self.writeCache(text)
+                self.finishRefresh()
             }
         }
+    }
+
+    private func finishRefresh() {
+        refreshInFlight = false
+        guard refreshPending, !isStopping else { return }
+        refreshPending = false
+        refresh()
     }
 
     private func ensureServer(_ completion: @escaping (Bool) -> Void) {
