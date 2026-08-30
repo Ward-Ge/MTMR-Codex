@@ -47,13 +47,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        TouchBarController.shared.prepareForApplicationTermination()
         if let hotKey = statusItemHotKey {
             UnregisterEventHotKey(hotKey)
         }
         if let handler = statusItemHotKeyHandler {
             RemoveEventHandler(handler)
         }
-        CodexQuotaService.shared.stop()
+        CodexQuotaService.shared.stopSynchronously()
     }
 
     func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {

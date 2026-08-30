@@ -175,6 +175,12 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             || virtualEscapeKeyChanged
 
         if !changed {
+            // Keep the objects currently installed in BasicView. createItems() builds
+            // temporary replacements while checking app-specific visibility; retaining
+            // those replacements here would leave the displayed buttons detached from
+            // the controller's item registry after an application/account switch.
+            items = prevItems
+            swipeItems = prevSwipeItems
             return
         }
         
@@ -354,15 +360,18 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     }
 
     private func quitApplication() {
+        // Finish the current Touch Bar event before asking AppKit to terminate.
+        DispatchQueue.main.async { [weak self] in
+            guard self != nil else { return }
+            NSApp.terminate(nil)
+        }
+    }
+
+    func prepareForApplicationTermination() {
         if let touchBar = touchBar {
             minimizeSystemModal(touchBar)
         }
         DFRElementSetControlStripPresenceForIdentifier(.controlStripItem, false)
-
-        // Finish the current Touch Bar event before asking AppKit to terminate.
-        DispatchQueue.main.async {
-            NSApp.terminate(nil)
-        }
     }
 
     @objc func resetControlStrip() {

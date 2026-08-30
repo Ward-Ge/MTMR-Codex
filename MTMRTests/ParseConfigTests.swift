@@ -46,6 +46,37 @@ class ParseConfig: XCTestCase {
         }
     }
 
+    func testButtonQuitAction() {
+        let fixture = """
+            [{ "type": "staticButton", "title": "⏻", "actions": [
+              { "trigger": "singleTap", "action": "quit" }
+            ] }]
+        """.data(using: .utf8)!
+        let result = try? JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        guard case .quit? = result?.first?.actions.first?.value else {
+            XCTFail()
+            return
+        }
+    }
+
+    func testLegacyKillallPowerButtonUsesGracefulQuit() {
+        let fixture = """
+            [{ "type": "staticButton", "title": "⏻", "actions": [
+              {
+                "trigger": "singleTap",
+                "action": "shellScript",
+                "executablePath": "/usr/bin/killall",
+                "shellArguments": ["MTMR"]
+              }
+            ] }]
+        """.data(using: .utf8)!
+        let result = try? JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        guard case .quit? = result?.first?.actions.first?.value else {
+            XCTFail()
+            return
+        }
+    }
+
     func testPredefinedItem() {
         let buttonKeycodeFixture = """
             [  { "type": "escape" } ]

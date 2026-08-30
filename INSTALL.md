@@ -18,10 +18,12 @@ Codex App Server 内置进安装包。使用前需要安装并登录 Codex App�
    `/Applications/MTMR.app`，随后退出并重新打开 MTMR。
 6. 如果尚未登录，请先在 Codex App、ChatGPT App 或 Codex CLI 中完成登录。
 
-MTMR 会使用 Codex 官方 App Server 登录流程，不读取或复制用户的 Token。
+MTMR 会通过 Codex 官方 App Server 临时读取当前账号额度，不读取或复制用户的 Token；
+读取不会启动模型任务或消耗 Codex 对话额度，完成后会立即释放临时连接。
 额度默认每 60 秒刷新一次，可在顶部系统菜单中按秒自定义刷新间隔；保存后会立即刷新。
+在 Codex 或 ChatGPT 中切换账号后，下一次刷新会自动显示新账号额度，无需重启 MTMR。
 如果到点时上一轮查询尚未结束，MTMR 会在查询结束后自动补刷，不再丢弃这一轮。
-网络失败时保留上一次数据，并等待下一个刷新周期。
+网络失败时会自动重试一次，同时保留上一次有效数据。
 升级自旧版时，App 会识别并清理旧的 Python 刷新脚本和对应 LaunchAgent，
 避免两个刷新器同时覆盖额度显示；其他用户配置不会被覆盖。
 

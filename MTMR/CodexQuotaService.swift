@@ -71,13 +71,22 @@ final class CodexQuotaService {
 
     func stop() {
         queue.async { [weak self] in
-            guard let self = self else { return }
-            self.isStopping = true
-            self.timer?.cancel()
-            self.timer = nil
-            self.refreshPending = false
-            self.stopServer(error: ServiceError.serverUnavailable)
+            self?.stopService()
         }
+    }
+
+    func stopSynchronously() {
+        queue.sync { [weak self] in
+            self?.stopService()
+        }
+    }
+
+    private func stopService() {
+        isStopping = true
+        timer?.cancel()
+        timer = nil
+        refreshPending = false
+        stopServer(error: ServiceError.serverUnavailable)
     }
 
     func refreshNow() {
@@ -165,7 +174,10 @@ final class CodexQuotaService {
             return
         }
         refreshInFlight = true
+        requestQuota(restartOnFailure: true)
+    }
 
+    private func requestQuota(restartOnFailure: Bool) {
         ensureServer { [weak self] ready in
             guard let self = self else { return }
             guard ready else {
@@ -179,9 +191,13 @@ final class CodexQuotaService {
                     let payload = message["result"] as? JSON,
                     let text = self.formatQuota(payload)
                 else {
+                    if restartOnFailure, !self.isStopping {
+                        self.stopServer(error: ServiceError.serverUnavailable)
+                        self.requestQuota(restartOnFailure: false)
+                        return
+                    }
                     self.finishRefresh()
-                    // Keep the last successful cache. A failed refresh is retried by the next
-                    // queued or scheduled refresh.
+                    // Keep the last successful cache after the one automatic retry fails.
                     return
                 }
                 self.writeCache(text)
@@ -191,6 +207,9 @@ final class CodexQuotaService {
     }
 
     private func finishRefresh() {
+        // MTMR is only an external reader. End the temporary Codex connection after
+        // every read so the next refresh always uses the account currently active in Codex.
+        stopServer(error: ServiceError.serverUnavailable)
         refreshInFlight = false
         guard refreshPending, !isStopping else { return }
         refreshPending = false
