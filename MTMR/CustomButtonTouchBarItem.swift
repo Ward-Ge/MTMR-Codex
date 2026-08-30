@@ -163,6 +163,12 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
             break
         }
     }
+
+    fileprivate func restoreAppearanceAfterTouch() {
+        button.highlight(false)
+        button.attributedTitle = attributedTitle
+        button.needsDisplay = true
+    }
 }
 
 class CustomHeightButton: NSButton {
@@ -283,6 +289,7 @@ final class MultiClickGestureRecognizer: NSClickGestureRecognizer {
     override func touchesEnded(with event: NSEvent) {
         HapticFeedback.instance.tap(type: .back)
         super.touchesEnded(with: event)
+        restoreTargetAppearance()
         _clickCount += 1
         
         var delayThreshold: TimeInterval // fine tune this as needed
@@ -305,6 +312,21 @@ final class MultiClickGestureRecognizer: NSClickGestureRecognizer {
                 _ = target?.perform(_doubleAction)
             }
         }
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        super.touchesMoved(with: event)
+        restoreTargetAppearance()
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        super.touchesCancelled(with: event)
+        _clickCount = 0
+        restoreTargetAppearance()
+    }
+
+    private func restoreTargetAppearance() {
+        (target as? CustomButtonTouchBarItem)?.restoreAppearanceAfterTouch()
     }
 
     @objc private func _resetAndPerformActionIfNecessary() {
@@ -336,16 +358,23 @@ class LongPressGestureRecognizer: NSPressGestureRecognizer {
     override func touchesMoved(with event: NSEvent) {
         timerInvalidate() // to prevent it for built-in two/three-finger gestures
         super.touchesMoved(with: event)
+        restoreTargetAppearance()
     }
     
     override func touchesCancelled(with event: NSEvent) {
         timerInvalidate()
         super.touchesCancelled(with: event)
+        restoreTargetAppearance()
     }
     
     override func touchesEnded(with event: NSEvent) {
         timerInvalidate()
         super.touchesEnded(with: event)
+        restoreTargetAppearance()
+    }
+
+    private func restoreTargetAppearance() {
+        (target as? CustomButtonTouchBarItem)?.restoreAppearanceAfterTouch()
     }
     
     private func timerInvalidate() {
