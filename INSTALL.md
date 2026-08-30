@@ -14,7 +14,7 @@ Codex App Server 内置进安装包。使用前需要安装并登录 Codex App�
    - 打开“系统设置 → 隐私与安全性”；
    - 找到 MTMR，点击“仍要打开”。
 5. 在“系统设置 → 隐私与安全性 → 辅助功能”中允许 MTMR。
-6. 如果尚未登录 Codex，在 MTMR 菜单中点击“登录 Codex…”。
+6. 如果尚未登录，请先在 Codex App、ChatGPT App 或 Codex CLI 中完成登录。
 
 MTMR 会使用 Codex 官方 App Server 登录流程，不读取或复制用户的 Token。
 额度每分钟刷新一次。网络失败时保留上一次数据，并等待下一个刷新周期。

@@ -30,6 +30,7 @@
 - 每分钟自动刷新，网络失败时保留上一次有效结果；
 - 使用 Codex 官方 App Server 登录流程，不读取或复制用户 Token；
 - 自动清理本项目旧版遗留的 Python 刷新脚本和 LaunchAgent；
+- 可按机型显示虚拟 Esc，并支持隐藏顶部菜单栏图标；
 - 提供 Intel 与 Apple Silicon 通用安装包。
 
 从 1.1.0 开始，安装包不再内置体积较大的 Codex App Server。MTMR-Codex 会使用
@@ -50,7 +51,7 @@
    下载 `MTMR-Codex-*-macOS-universal.dmg`。
 2. 打开 DMG，把 `MTMR.app` 拖入“应用程序”。
 3. 第一次启动时，按 [安装说明](INSTALL.md) 完成“仍要打开”和辅助功能授权。
-4. MTMR 会自动查找已安装的 Codex；需要登录时可点击菜单栏中的“登录 Codex…”。
+4. MTMR 会自动查找已安装并登录的 Codex、ChatGPT App 或 Codex CLI。
 
 ## 配置 Touch Bar
 

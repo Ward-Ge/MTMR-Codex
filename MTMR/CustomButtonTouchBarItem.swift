@@ -165,6 +165,13 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
     }
 
     fileprivate func restoreAppearanceAfterTouch() {
+        restoreAppearance()
+        DispatchQueue.main.async { [weak self] in
+            self?.restoreAppearance()
+        }
+    }
+
+    private func restoreAppearance() {
         button.highlight(false)
         button.attributedTitle = attributedTitle
         button.needsDisplay = true
@@ -191,13 +198,11 @@ class CustomButtonCell: NSButtonCell {
     }
 
     override func highlight(_ flag: Bool, withFrame cellFrame: NSRect, in controlView: NSView) {
-        super.highlight(flag, withFrame: cellFrame, in: controlView)
-        if !isBordered {
-            if flag {
-                setAttributedTitle(attributedTitle, withColor: .lightGray)
-            } else if let parentItem = self.parentItem {
-                attributedTitle = parentItem.attributedTitle
-            }
+        if isBordered {
+            super.highlight(flag, withFrame: cellFrame, in: controlView)
+        } else if let parentItem = self.parentItem {
+            attributedTitle = parentItem.attributedTitle
+            controlView.needsDisplay = true
         }
     }
     

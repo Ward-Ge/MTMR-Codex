@@ -7,6 +7,7 @@
 //
 
 import Cocoa
+import Carbon
 
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -15,8 +16,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var fileSystemSource: DispatchSourceFileSystemObject?
     private var displaySettingsWindowController: DisplaySettingsWindowController?
+    private var statusItemHotKey: EventHotKeyRef?
+    private var statusItemHotKeyHandler: EventHandlerRef?
 
     func applicationDidFinishLaunching(_: Notification) {
+        AppSettings.configureMachineDefaults()
         CodexQuotaService.shared.start()
         TouchBarController.shared.setupControlStripPresence()
 
@@ -24,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = #imageLiteral(resourceName: "StatusImage")
         }
         createMenu()
+        statusItem.isVisible = !AppSettings.hideStatusItemState
+        registerStatusItemHotKey()
 
         reloadOnDefaultConfigChanged()
 
@@ -33,7 +39,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        if let hotKey = statusItemHotKey {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let handler = statusItemHotKeyHandler {
+            RemoveEventHandler(handler)
+        }
         CodexQuotaService.shared.stop()
+    }
+
+    func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+        revealStatusItem()
+        return true
     }
 
     @objc func refreshCodexQuota(_: Any?) {
@@ -120,6 +137,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         createMenu()
     }
 
+    @objc func toggleVirtualEscapeKey(_ item: NSMenuItem) {
+        item.state = item.state == .on ? .off : .on
+        AppSettings.showVirtualEscapeKeyState = item.state == .on
+        TouchBarController.shared.refreshTouchBar()
+    }
+
+    @objc func hideStatusItem(_: Any?) {
+        AppSettings.hideStatusItemState = true
+        DispatchQueue.main.async { [weak self] in
+            self?.statusItem.isVisible = false
+        }
+    }
+
+    private func revealStatusItem() {
+        guard !statusItem.isVisible else { return }
+        AppSettings.hideStatusItemState = false
+        statusItem.isVisible = true
+        createMenu()
+    }
+
+    private func registerStatusItemHotKey() {
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let userData = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userData -> OSStatus in
+                guard let event = event, let userData = userData else { return noErr }
+                var hotKeyID = EventHotKeyID()
+                let status = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard status == noErr, hotKeyID.id == 1 else { return noErr }
+                let appDelegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    appDelegate.revealStatusItem()
+                }
+                return noErr
+            },
+            1,
+            &eventType,
+            userData,
+            &statusItemHotKeyHandler
+        )
+
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4D_54_4D_52), id: 1)
+        RegisterEventHotKey(
+            UInt32(kVK_ANSI_M),
+            UInt32(cmdKey | optionKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &statusItemHotKey
+        )
+    }
+
     func createMenu() {
         let menu = NSMenu()
 
@@ -132,13 +213,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hapticFeedback = NSMenuItem(title: "震动反馈", action: #selector(toggleHapticFeedback(_:)), keyEquivalent: "")
         hapticFeedback.state = AppSettings.hapticFeedbackState ? .on : .off
 
+        let virtualEscapeKey = NSMenuItem(title: "虚拟 Esc 键", action: #selector(toggleVirtualEscapeKey(_:)), keyEquivalent: "")
+        virtualEscapeKey.state = AppSettings.showVirtualEscapeKeyState ? .on : .off
+
+        let hideStatusItem = NSMenuItem(title: "隐藏顶部图标", action: #selector(hideStatusItem(_:)), keyEquivalent: "m")
+        hideStatusItem.keyEquivalentModifierMask = [.command, .option]
+
         menu.addItem(withTitle: "刷新 Codex 额度", action: #selector(refreshCodexQuota(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "显示设置…", action: #selector(openDisplaySettings(_:)), keyEquivalent: "")
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(hapticFeedback)
         menu.addItem(hideControlStrip)
+        menu.addItem(virtualEscapeKey)
         menu.addItem(startAtLogin)
+        menu.addItem(hideStatusItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu

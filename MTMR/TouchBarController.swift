@@ -82,6 +82,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     var basicViewIdentifier = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollView.".appending(UUID().uuidString))
     var basicView: BasicView?
     var swipeItems: [SwipeItem] = []
+    private var lastShowsVirtualEscapeKey: Bool?
+    private var virtualEscapeKeyItem: NSCustomTouchBarItem?
 
     var blacklistAppIdentifiers: [String] = []
     var frontmostApplicationIdentifier: String? {
@@ -166,7 +168,11 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
 
         createItems()
 
+        let showsVirtualEscapeKey = AppSettings.showVirtualEscapeKeyState
+        let virtualEscapeKeyChanged = lastShowsVirtualEscapeKey != showsVirtualEscapeKey
+        lastShowsVirtualEscapeKey = showsVirtualEscapeKey
         let changed = didItemsChange(prevItems: prevItems, prevSwipeItems: prevSwipeItems)
+            || virtualEscapeKeyChanged
 
         if !changed {
             return
@@ -184,15 +190,49 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         touchBar.delegate = self
         touchBar.defaultItemIdentifiers = [basicViewIdentifier]
 
-        let leftItems = leftIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
+        var leftItems = leftIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
             items[identifier]
         })
+        if showsVirtualEscapeKey {
+            let escapeItem = makeVirtualEscapeKeyItem()
+            virtualEscapeKeyItem = escapeItem
+            leftItems.insert(escapeItem, at: 0)
+        } else {
+            let spacerItem = makeVirtualEscapeKeySpacerItem()
+            virtualEscapeKeyItem = spacerItem
+            leftItems.insert(spacerItem, at: 0)
+        }
         let rightItems = rightIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
             items[identifier]
         })
 
         basicView = BasicView(identifier: basicViewIdentifier, items:leftItems + [scrollArea] + rightItems, swipeItems: swipeItems)
         basicView?.legacyGesturesEnabled = AppSettings.multitouchGestures
+    }
+
+    private func makeVirtualEscapeKeyItem() -> NSCustomTouchBarItem {
+        let identifier = NSTouchBarItem.Identifier("com.wardge.mtmr.virtualEscapeKey")
+        let item = NSCustomTouchBarItem(identifier: identifier)
+        let button = CustomHeightButton(title: "esc", target: self, action: #selector(sendVirtualEscapeKey))
+        button.isBordered = false
+        button.bezelStyle = .inline
+        button.attributedTitle = "esc".defaultTouchbarAttributedString
+        item.view = button
+        item.setWidth(value: 52)
+        return item
+    }
+
+    private func makeVirtualEscapeKeySpacerItem() -> NSCustomTouchBarItem {
+        let identifier = NSTouchBarItem.Identifier("com.wardge.mtmr.virtualEscapeKeySpacer")
+        let item = NSCustomTouchBarItem(identifier: identifier)
+        item.view = NSView(frame: .zero)
+        item.setWidth(value: 52)
+        return item
+    }
+
+    @objc private func sendVirtualEscapeKey() {
+        HapticFeedback.instance.tap(type: .click)
+        EscapeKeyPress.send()
     }
 
     @objc func activeApplicationChanged(_: Notification) {
@@ -324,6 +364,10 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
 
     @objc func resetControlStrip() {
         dismissTouchBar()
+        updateActiveApp()
+    }
+
+    func refreshTouchBar() {
         updateActiveApp()
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct AppSettings {
     @UserDefault(key: "com.toxblh.mtmr.settings.showControlStrip", defaultValue: false)
@@ -15,6 +16,45 @@ struct AppSettings {
     
     @UserDefault(key: "com.toxblh.mtmr.dock.persistent", defaultValue: [])
     static var dockPersistentAppIds: [String]
+
+    @UserDefault(key: "com.wardge.mtmr.settings.hideStatusItem", defaultValue: false)
+    static var hideStatusItemState: Bool
+
+    @UserDefault(key: "com.wardge.mtmr.settings.showVirtualEscapeKey", defaultValue: false)
+    static var showVirtualEscapeKeyState: Bool
+
+    static func configureMachineDefaults() {
+        let virtualEscapeKeyPreference = "com.wardge.mtmr.settings.showVirtualEscapeKey"
+        guard UserDefaults.standard.object(forKey: virtualEscapeKeyPreference) == nil else { return }
+        showVirtualEscapeKeyState = HardwareProfile.needsVirtualEscapeKey
+    }
+}
+
+private enum HardwareProfile {
+    private static let touchBarModelsWithoutPhysicalEscape: Set<String> = [
+        "MacBookPro13,2", "MacBookPro13,3",
+        "MacBookPro14,2", "MacBookPro14,3",
+        "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4"
+    ]
+
+    static var needsVirtualEscapeKey: Bool {
+        guard let model = modelIdentifier else { return false }
+        return touchBarModelsWithoutPhysicalEscape.contains(model)
+    }
+
+    private static var modelIdentifier: String? {
+        var size: size_t = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else {
+            return nil
+        }
+
+        var value = [CChar](repeating: 0, count: size)
+        let result = value.withUnsafeMutableBytes { buffer in
+            sysctlbyname("hw.model", buffer.baseAddress, &size, nil, 0)
+        }
+        guard result == 0 else { return nil }
+        return String(cString: value)
+    }
 }
 
 struct DisplaySettings {

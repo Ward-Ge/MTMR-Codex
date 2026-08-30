@@ -17,6 +17,16 @@ struct GenericKeyPress: KeyPress {
     var keyCode: CGKeyCode
 }
 
+enum EscapeKeyPress {
+    static func send() {
+        if #available(macOS 10.15, *), !CGPreflightPostEventAccess() {
+            guard CGRequestPostEventAccess() else { return }
+        }
+
+        GenericKeyPress(keyCode: 53).send()
+    }
+}
+
 extension KeyPress {
     func send() {
         let src = CGEventSource(stateID: .hidSystemState)
