@@ -12,6 +12,7 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
     private let source: String
     private var forceHideConstraint: NSLayoutConstraint!
     private var quotaCacheObserver: NSObjectProtocol?
+    private var displaySettingsObserver: NSObjectProtocol?
     
     struct ScriptResult: Decodable {
         var title: String?
@@ -34,6 +35,16 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
                 self?.refresh()
             }
         }
+
+        displaySettingsObserver = NotificationCenter.default.addObserver(
+            forName: DisplaySettings.didChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            DispatchQueue.shellScriptQueue.async {
+                self?.refresh()
+            }
+        }
         
         DispatchQueue.shellScriptQueue.async {
             self.refreshAndSchedule()
@@ -42,6 +53,9 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
 
     deinit {
         if let observer = quotaCacheObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = displaySettingsObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -75,6 +89,8 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
             rawTitle = scriptResult
         }
 
+        rawTitle = quotaTitleApplyingDisplaySelection(rawTitle)
+
         // Apply returned text attributes (if they were returned) to our result string
         let helper = AMR_ANSIEscapeHelper.init()
         helper.defaultStringColor = NSColor.white
@@ -84,8 +100,17 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
         let fullRange = NSRange(location: 0, length: titleString.length)
         let isTwoLine = title.string.contains("\n")
 
+        func firstProgressLocation(in lineRange: NSRange) -> Int? {
+            let filled = titleString.range(of: "▰", options: [], range: lineRange)
+            let empty = titleString.range(of: "▱", options: [], range: lineRange)
+            return [filled, empty]
+                .filter { $0.location != NSNotFound }
+                .map { $0.location }
+                .min()
+        }
+
         let regularFont = NSFont.systemFont(ofSize: isTwoLine ? 10.5 : 15, weight: .regular)
-        let codeXFont = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+        let codeXFont = NSFont.systemFont(ofSize: CGFloat(DisplaySettings.codeXFontSize), weight: .semibold)
         let dataFont = NSFont.monospacedDigitSystemFont(
             ofSize: isTwoLine ? 10.5 : 15,
             weight: .regular
@@ -100,8 +125,9 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
         paragraph.alignment = isTwoLine ? .left : .center
         paragraph.lineBreakMode = .byClipping
         if isTwoLine {
-            paragraph.minimumLineHeight = 10.5
-            paragraph.maximumLineHeight = 10.5
+            let lineHeight = CGFloat(DisplaySettings.lineHeight)
+            paragraph.minimumLineHeight = lineHeight
+            paragraph.maximumLineHeight = lineHeight
         }
         title.addAttributes([
             .font: regularFont,
@@ -109,40 +135,38 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
             .paragraphStyle: paragraph
         ], range: fullRange)
 
-        if isTwoLine {
-            let newlineRange = titleString.range(of: "\n")
-            if newlineRange.location != NSNotFound {
-                let firstLineRange = NSRange(location: 0, length: newlineRange.location)
-                let secondLineStart = NSMaxRange(newlineRange)
-                let secondLineRange = NSRange(location: secondLineStart, length: titleString.length - secondLineStart)
+        let newlineRange = titleString.range(of: "\n")
+        let firstLineLength = newlineRange.location == NSNotFound ? titleString.length : newlineRange.location
+        let firstLineRange = NSRange(location: 0, length: firstLineLength)
+        if let firstBar = firstProgressLocation(in: firstLineRange) {
+            title.addAttribute(
+                .font,
+                value: codeXFont,
+                range: NSRange(location: 0, length: firstBar)
+            )
+            if isTwoLine {
+                title.addAttribute(
+                    .baselineOffset,
+                    value: -8.25,
+                    range: NSRange(location: 0, length: firstBar)
+                )
+            }
+        }
 
-                func firstProgressLocation(in lineRange: NSRange) -> Int? {
-                    let filled = titleString.range(of: "▰", options: [], range: lineRange)
-                    let empty = titleString.range(of: "▱", options: [], range: lineRange)
-                    let locations = [filled, empty]
-                        .filter { $0.location != NSNotFound }
-                        .map { $0.location }
-                    return locations.min()
-                }
-
-                if let firstBar = firstProgressLocation(in: firstLineRange) {
-                    title.addAttributes([
-                        .font: codeXFont,
-                        .baselineOffset: -8.25
-                    ], range: NSRange(location: 0, length: firstBar))
-                }
-                if let secondBar = firstProgressLocation(in: secondLineRange) {
-                    title.addAttributes([
-                        .font: codeXFont,
-                        .foregroundColor: NSColor.clear,
-                        .baselineOffset: 3
-                    ], range: NSRange(location: secondLineStart, length: secondBar - secondLineStart))
-                    title.addAttribute(
-                        .baselineOffset,
-                        value: 3,
-                        range: NSRange(location: secondBar, length: titleString.length - secondBar)
-                    )
-                }
+        if isTwoLine, newlineRange.location != NSNotFound {
+            let secondLineStart = NSMaxRange(newlineRange)
+            let secondLineRange = NSRange(location: secondLineStart, length: titleString.length - secondLineStart)
+            if let secondBar = firstProgressLocation(in: secondLineRange) {
+                title.addAttributes([
+                    .font: codeXFont,
+                    .foregroundColor: NSColor.clear,
+                    .baselineOffset: 3
+                ], range: NSRange(location: secondLineStart, length: secondBar - secondLineStart))
+                title.addAttribute(
+                    .baselineOffset,
+                    value: 3,
+                    range: NSRange(location: secondBar, length: titleString.length - secondBar)
+                )
             }
         }
 
@@ -229,6 +253,25 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
             }
             self?.forceHideConstraint.isActive = scriptResult == ""
         }
+    }
+
+    private func quotaTitleApplyingDisplaySelection(_ rawTitle: String) -> String {
+        let lines = rawTitle
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        let isQuotaOutput = lines.count == 2 && lines.allSatisfy {
+            $0.contains("CodeX") && ($0.contains("▰") || $0.contains("▱"))
+        }
+        guard isQuotaOutput else { return rawTitle }
+
+        var visibleLines: [String] = []
+        if DisplaySettings.showFiveHour {
+            visibleLines.append(lines[0])
+        }
+        if DisplaySettings.showWeekly {
+            visibleLines.append(lines[1])
+        }
+        return visibleLines.isEmpty ? lines[0] : visibleLines.joined(separator: "\n")
     }
     
     func execute(_ command: String) -> String {

@@ -217,14 +217,56 @@ class CustomButtonCell: NSButtonCell {
         withFrame frame: NSRect,
         in controlView: NSView
     ) -> NSRect {
-        if title.string.contains("\n") {
-            return super.drawTitle(
-                title,
-                withFrame: frame.offsetBy(dx: 70, dy: 8),
-                in: controlView
-            )
+        guard title.string.contains("CodeX") else {
+            return super.drawTitle(title, withFrame: frame, in: controlView)
         }
-        return super.drawTitle(title, withFrame: frame, in: controlView)
+
+        let titleString = title.string as NSString
+        let filled = titleString.range(of: "▰")
+        let empty = titleString.range(of: "▱")
+        let firstProgressLocation = [filled, empty]
+            .filter { $0.location != NSNotFound }
+            .map { $0.location }
+            .min()
+
+        guard let prefixEnd = firstProgressLocation, prefixEnd > 0 else {
+            return super.drawTitle(title, withFrame: frame, in: controlView)
+        }
+
+        let isTwoLine = title.string.contains("\n")
+        let contentOffsetX = isTwoLine
+            ? DisplaySettings.contentOffsetX
+            : DisplaySettings.contentOffsetX - DisplaySettings.defaultContentOffsetX
+        let contentOffsetY = isTwoLine
+            ? DisplaySettings.contentOffsetY
+            : DisplaySettings.contentOffsetY - DisplaySettings.defaultContentOffsetY
+        let contentFrame = frame.offsetBy(
+            dx: CGFloat(contentOffsetX),
+            dy: CGFloat(contentOffsetY)
+        )
+
+        let prefixRange = NSRange(location: 0, length: prefixEnd)
+        let baseTitle = NSMutableAttributedString(attributedString: title)
+        baseTitle.addAttribute(.foregroundColor, value: NSColor.clear, range: prefixRange)
+        let result = super.drawTitle(baseTitle, withFrame: contentFrame, in: controlView)
+
+        let overlayTitle = NSMutableAttributedString(attributedString: title)
+        let fullRange = NSRange(location: 0, length: overlayTitle.length)
+        overlayTitle.addAttribute(.foregroundColor, value: NSColor.clear, range: fullRange)
+        title.enumerateAttribute(.foregroundColor, in: prefixRange) { value, range, _ in
+            if let color = value as? NSColor {
+                overlayTitle.addAttribute(.foregroundColor, value: color, range: range)
+            }
+        }
+        _ = super.drawTitle(
+            overlayTitle,
+            withFrame: contentFrame.offsetBy(
+                dx: CGFloat(DisplaySettings.codeXOffsetX),
+                dy: CGFloat(DisplaySettings.codeXOffsetY)
+            ),
+            in: controlView
+        )
+        return result
     }
 
     required init(coder _: NSCoder) {
