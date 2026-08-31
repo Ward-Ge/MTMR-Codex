@@ -204,9 +204,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             virtualEscapeKeyItem = escapeItem
             leftItems.insert(escapeItem, at: 0)
         } else {
-            let spacerItem = makeVirtualEscapeKeySpacerItem()
-            virtualEscapeKeyItem = spacerItem
-            leftItems.insert(spacerItem, at: 0)
+            virtualEscapeKeyItem = nil
         }
         let rightItems = rightIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
             items[identifier]
@@ -224,14 +222,6 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         button.bezelStyle = .inline
         button.attributedTitle = "esc".defaultTouchbarAttributedString
         item.view = button
-        item.setWidth(value: 52)
-        return item
-    }
-
-    private func makeVirtualEscapeKeySpacerItem() -> NSCustomTouchBarItem {
-        let identifier = NSTouchBarItem.Identifier("com.wardge.mtmr.virtualEscapeKeySpacer")
-        let item = NSCustomTouchBarItem(identifier: identifier)
-        item.view = NSView(frame: .zero)
         item.setWidth(value: 52)
         return item
     }
