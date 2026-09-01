@@ -11,14 +11,32 @@
 
 ## 使用效果
 
+### 同时显示 5 小时和 7 天额度
+
 <p align="center">
-  <a href="Resources/screenshots/codex-touch-bar.png">
-    <img src="Resources/screenshots/codex-touch-bar.png" width="100%" alt="MTMR-Codex 在 Touch Bar 上显示两行 Codex 配额">
+  <a href="Resources/screenshots/codex-touch-bar-both-quotas.png">
+    <img src="Resources/screenshots/codex-touch-bar-both-quotas.png" width="100%" alt="MTMR-Codex 在 Touch Bar 上同时显示 5 小时和 7 天额度">
   </a>
 </p>
 
-上图为 Intel Touch Bar Mac 的实际运行截图：第一行显示 5 小时额度，第二行显示
-7 天额度；彩色进度条后依次为剩余额度和重置倒计时。点击图片可查看原始尺寸。
+### 仅显示 5 小时额度
+
+<p align="center">
+  <a href="Resources/screenshots/codex-touch-bar-five-hour.png">
+    <img src="Resources/screenshots/codex-touch-bar-five-hour.png" width="100%" alt="MTMR-Codex 在 Touch Bar 上仅显示 5 小时额度">
+  </a>
+</p>
+
+### 仅显示 7 天额度
+
+<p align="center">
+  <a href="Resources/screenshots/codex-touch-bar-seven-day.png">
+    <img src="Resources/screenshots/codex-touch-bar-seven-day.png" width="100%" alt="MTMR-Codex 在 Touch Bar 上仅显示 7 天额度">
+  </a>
+</p>
+
+以上均为 Intel Touch Bar Mac 的实际运行截图。彩色进度条后依次为剩余额度和
+重置倒计时；点击图片可查看原始尺寸。显示内容可从 MTMR 菜单栏设置中切换。
 
 ## 这个版本做了什么
 
