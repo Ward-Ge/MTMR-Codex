@@ -11,6 +11,14 @@
 
 ## 使用效果
 
+<p align="center">
+  <a href="Resources/screenshots/codex-touch-bar-product-shot.png">
+    <img src="Resources/screenshots/codex-touch-bar-product-shot.png" width="100%" alt="俯拍 MacBook Pro 展示 MTMR-Codex 双行额度的效果图">
+  </a>
+</p>
+
+<p align="center"><em>Touch Bar 展示效果图</em></p>
+
 ### 同时显示 5 小时和 7 天额度
 
 <p align="center">
