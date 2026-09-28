@@ -555,17 +555,28 @@ final class CodexQuotaService {
             return (bundled, [])
         }
 
-        var candidates: [URL] = []
-        if let codexApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
-            candidates.append(codexApp.appendingPathComponent("Contents/Resources/codex"))
+        let home = fileManager.homeDirectoryForCurrentUser
+        var appURLs = ["com.openai.codex", "com.openai.chat"].compactMap {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
         }
-        candidates.append(URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"))
-        candidates.append(FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Applications/ChatGPT.app/Contents/Resources/codex"))
+        for name in ["Codex.app", "ChatGPT.app"] {
+            appURLs.append(URL(fileURLWithPath: "/Applications/\(name)"))
+            appURLs.append(home.appendingPathComponent("Applications/\(name)"))
+        }
+
+        // Prefer the actual executable in the new nested bundle, then its wrapper
+        // and the legacy layout used by older desktop releases.
+        let cliPaths = [
+            "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "Contents/Resources/codex-cli/bin/codex",
+            "Contents/Resources/codex"
+        ]
+        var candidates = appURLs.flatMap { appURL in
+            cliPaths.map { appURL.appendingPathComponent($0) }
+        }
         candidates.append(URL(fileURLWithPath: "/opt/homebrew/bin/codex"))
         candidates.append(URL(fileURLWithPath: "/usr/local/bin/codex"))
-        candidates.append(FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local/bin/codex"))
+        candidates.append(home.appendingPathComponent(".local/bin/codex"))
 
         if let cli = candidates.first(where: { fileManager.isExecutableFile(atPath: $0.path) }) {
             return (cli, ["app-server", "--stdio"])
