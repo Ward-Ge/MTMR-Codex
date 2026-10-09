@@ -17,6 +17,7 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
     struct ScriptResult: Decodable {
         var title: String?
         var image: Source?
+        var codexQuota: CodexQuotaSnapshot?
     }
 
     init?(identifier: NSTouchBarItem.Identifier, source: SourceProtocol, interval: TimeInterval) {
@@ -82,14 +83,15 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
             let decoder = JSONDecoder()
             let result = try decoder.decode(ScriptResult.self, from: scriptResult.data(using: .utf8)!)
             json = true
-            rawTitle = result.title ?? ""
+            rawTitle = result.codexQuota?.title(
+                showFiveHour: DisplaySettings.showFiveHour,
+                showWeekly: DisplaySettings.showWeekly
+            ) ?? quotaTitleApplyingDisplaySelection(result.title ?? "")
             image = result.image?.image
         } catch {
             json = false
-            rawTitle = scriptResult
+            rawTitle = quotaTitleApplyingDisplaySelection(scriptResult)
         }
-
-        rawTitle = quotaTitleApplyingDisplaySelection(rawTitle)
 
         // Apply returned text attributes (if they were returned) to our result string
         let helper = AMR_ANSIEscapeHelper.init()

@@ -396,6 +396,8 @@ private final class DisplaySettingsWindowController: NSWindowController {
     private var valueLabels: [Setting: NSTextField] = [:]
     private var showFiveHourButton: NSButton!
     private var showWeeklyButton: NSButton!
+    private var quotaCacheObserver: NSObjectProtocol?
+    private let accountHint = NSTextField(labelWithString: "拖动滑块会立即更新 Touch Bar 显示")
 
     init() {
         let window = NSWindow(
@@ -409,6 +411,20 @@ private final class DisplaySettingsWindowController: NSWindowController {
         window.center()
         super.init(window: window)
         buildContent()
+        updateQuotaChoices()
+        quotaCacheObserver = NotificationCenter.default.addObserver(
+            forName: CodexQuotaService.cacheDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateQuotaChoices()
+        }
+    }
+
+    deinit {
+        if let observer = quotaCacheObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     required init?(coder _: NSCoder) {
@@ -425,9 +441,8 @@ private final class DisplaySettingsWindowController: NSWindowController {
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
 
-        let hint = NSTextField(labelWithString: "拖动滑块会立即更新 Touch Bar 显示")
-        hint.textColor = .secondaryLabelColor
-        stack.addArrangedSubview(hint)
+        accountHint.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(accountHint)
 
         let displayTitle = NSTextField(labelWithString: "Bar 显示内容")
         displayTitle.alignment = .right
@@ -539,6 +554,26 @@ private final class DisplaySettingsWindowController: NSWindowController {
         DisplaySettings.showFiveHour = showFiveHour
         DisplaySettings.showWeekly = showWeekly
         DisplaySettings.notifyChange()
+    }
+
+    private func updateQuotaChoices() {
+        guard let quota = CodexQuotaService.shared.currentQuota else {
+            showFiveHourButton.isEnabled = true
+            showWeeklyButton.isEnabled = true
+            return
+        }
+        showFiveHourButton.isEnabled = quota.hasWindow(.fiveHour)
+        showWeeklyButton.isEnabled = quota.hasWindow(.weekly)
+        let visible = quota.visibleWindows(
+            showFiveHour: DisplaySettings.showFiveHour,
+            showWeekly: DisplaySettings.showWeekly
+        )
+        showFiveHourButton.state = visible.contains { $0.kind == .fiveHour } ? .on : .off
+        showWeeklyButton.state = visible.contains { $0.kind == .weekly } ? .on : .off
+        let plan = quota.plan.displayName
+        accountHint.stringValue = plan.isEmpty
+            ? "显示当前账号的可用额度；拖动滑块立即更新"
+            : "当前账号：\(plan)；仅显示可用额度，拖动滑块立即更新"
     }
 
     @objc private func resetSettings(_: Any?) {

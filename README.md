@@ -2,8 +2,9 @@
 
 <img src="Resources/logo.png" align="right" width="96" alt="MTMR logo">
 
-让带 Touch Bar 的 MacBook Pro 直接显示当前 Codex 账号的 5 小时额度、7 天额度、
-使用进度和重置倒计时。
+让带 Touch Bar 的 MacBook Pro 根据当前 Codex 账号类型显示可用额度、
+使用进度和重置倒计时：Plus 支持 5 小时和周额度，Pro 不显示 5 小时额度，
+Free 按接口返回的实际额度窗口显示。
 
 [下载最新版](https://github.com/Ward-Ge/MTMR-Codex/releases/latest) ·
 [安装说明](INSTALL.md) ·
@@ -43,7 +44,7 @@
   </a>
 </p>
 
-以上均为 Intel Touch Bar Mac 的实际运行截图。彩色进度条后依次为剩余额度和
+以上额度组合以 Plus 账号为例，均为 Intel Touch Bar Mac 的实际运行截图。彩色进度条后依次为剩余额度和
 重置倒计时；点击图片可查看原始尺寸。显示内容可从 MTMR 菜单栏设置中切换。
 
 ## 这个版本做了什么
@@ -51,7 +52,8 @@
 本仓库是 Ward-Ge 基于开源项目 [Toxblh/MTMR](https://github.com/Toxblh/MTMR)
 制作的用途定制版。它保留 MTMR 的 Touch Bar 自定义能力，并重点加入：
 
-- 在 Touch Bar 同时显示 Codex 5 小时和 7 天额度；
+- 区分 Free、Plus、Pro 账号，按实际窗口时长显示额度；Plus 保留 5 小时和周额度，Pro 隐藏 5 小时额度；
+- 显示设置仅启用当前账号可用的额度选项；切换账号后不会用旧缓存补齐缺失的窗口；
 - 显示使用进度、剩余额度和下一次重置时间；
 - 默认每 60 秒自动刷新，可从系统菜单栏按秒自定义刷新间隔；保存后立即刷新，上一轮查询尚未结束时会在结束后自动补刷；
 - 每次刷新都通过 Codex 官方 App Server 临时读取当前账号额度，读取完成后立即释放连接；切换账号后会在下一次刷新自动显示新账号；

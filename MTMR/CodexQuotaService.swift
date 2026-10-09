@@ -189,7 +189,7 @@ final class CodexQuotaService {
                 guard let self = self else { return }
                 guard case let .success(message) = result,
                     let payload = message["result"] as? JSON,
-                    let text = self.formatQuota(payload)
+                    CodexQuotaSnapshot(payload: payload) != nil
                 else {
                     if restartOnFailure, !self.isStopping {
                         self.stopServer(error: ServiceError.serverUnavailable)
@@ -200,10 +200,41 @@ final class CodexQuotaService {
                     // Keep the last successful cache after the one automatic retry fails.
                     return
                 }
-                self.writeCache(text)
-                self.finishRefresh()
+                if CodexQuotaSnapshot.planType(in: payload) == nil {
+                    // Older rate-limit responses omit the plan. Read it from the
+                    // same temporary connection, without reading local credentials.
+                    self.sendRequest(method: "account/read", params: ["refreshToken": false]) { [weak self] result in
+                        guard let self = self else { return }
+                        var plan: String?
+                        if case let .success(message) = result,
+                            let accountPayload = message["result"] as? JSON,
+                            let account = accountPayload["account"] as? JSON {
+                            plan = account["planType"] as? String
+                        }
+                        self.cacheQuota(payload, accountPlan: plan)
+                    }
+                } else {
+                    self.cacheQuota(payload, accountPlan: nil)
+                }
             }
         }
+    }
+
+    private func cacheQuota(_ payload: JSON, accountPlan: String?) {
+        if let snapshot = CodexQuotaSnapshot(payload: payload, accountPlan: accountPlan),
+            let data = try? JSONEncoder().encode(CodexQuotaSnapshot.Cache(
+                title: snapshot.title(),
+                codexQuota: snapshot
+            )),
+            let text = String(data: data, encoding: .utf8) {
+            writeCache(text + "\n")
+        }
+        finishRefresh()
+    }
+
+    var currentQuota: CodexQuotaSnapshot? {
+        guard let data = try? Data(contentsOf: cacheURL) else { return nil }
+        return (try? JSONDecoder().decode(CodexQuotaSnapshot.Cache.self, from: data))?.codexQuota
     }
 
     private func finishRefresh() {
@@ -401,103 +432,9 @@ final class CodexQuotaService {
         }
     }
 
-    private func formatQuota(_ payload: JSON) -> String? {
-        let rateLimits: JSON?
-        if let byID = payload["rateLimitsByLimitId"] as? JSON,
-            let codex = byID["codex"] as? JSON
-        {
-            rateLimits = codex
-        } else {
-            rateLimits = payload["rateLimits"] as? JSON
-        }
-
-        guard let limits = rateLimits else { return nil }
-        let previous = previousLines()
-        var lines: [String] = []
-
-        for key in ["primary", "secondary"] {
-            guard let window = limits[key] as? JSON else {
-                if previous.count > lines.count {
-                    lines.append(previous[lines.count])
-                } else {
-                    lines.append(placeholderLine())
-                }
-                continue
-            }
-
-            let used = integer(window["usedPercent"]) ?? 0
-            let remaining = max(0, min(100, 100 - used))
-            var countdown = resetCountdown(window["resetsAt"])
-            if countdown == "--", previous.count > lines.count,
-                let oldCountdown = countdownFromLine(previous[lines.count])
-            {
-                countdown = oldCountdown
-            }
-            lines.append(quotaLine(remaining: remaining, countdown: countdown))
-        }
-
-        return lines.joined(separator: "\n") + "\n"
-    }
-
-    private func quotaLine(remaining: Int, countdown: String) -> String {
-        let width = 10
-        var filled = Int((Double(remaining) * Double(width) / 100.0).rounded())
-        if remaining > 0 && remaining < 100 {
-            filled = max(1, min(width - 1, filled))
-        }
-        let bar = String(repeating: "▰", count: filled)
-            + String(repeating: "▱", count: width - filled)
-        let percentageText = String(remaining)
-        let percentage = String(repeating: " ", count: max(0, 3 - percentageText.count))
-            + percentageText + "%"
-        return "✦ CodeX  \(bar) \(percentage) ↻ \(countdown)"
-    }
-
-    private func placeholderLine() -> String {
-        return "✦ CodeX  ▱▱▱▱▱▱▱▱▱▱  --% ↻ --"
-    }
-
-    private func resetCountdown(_ value: Any?) -> String {
-        let resetDate: Date?
-        if let number = value as? NSNumber {
-            resetDate = Date(timeIntervalSince1970: number.doubleValue)
-        } else if let string = value as? String {
-            resetDate = ISO8601DateFormatter().date(from: string)
-        } else {
-            resetDate = nil
-        }
-
-        guard let date = resetDate else { return "--" }
-        let seconds = max(0, Int(date.timeIntervalSinceNow))
-        let days = seconds / 86_400
-        let hours = (seconds % 86_400) / 3_600
-        let minutes = (seconds % 3_600) / 60
-        if days > 0 {
-            return String(format: "%dd %02dh", days, hours)
-        }
-        return String(format: "%dh %02dm", hours, minutes)
-    }
-
-    private func integer(_ value: Any?) -> Int? {
-        if let number = value as? NSNumber { return number.intValue }
-        if let string = value as? String { return Int(string) }
-        return nil
-    }
-
-    private func previousLines() -> [String] {
-        guard let text = try? String(contentsOf: cacheURL, encoding: .utf8) else { return [] }
-        return text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
-    }
-
-    private func countdownFromLine(_ line: String) -> String? {
-        guard let marker = line.range(of: "↻") else { return nil }
-        let value = line[marker.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
-
     private func createInitialCacheIfNeeded() {
         guard !FileManager.default.fileExists(atPath: cacheURL.path) else { return }
-        writeCache(placeholderLine() + "\n" + placeholderLine() + "\n")
+        writeCache("✦ CodeX  正在读取额度\n")
     }
 
     private func removeLegacyUpdaterIfNeeded() {
